@@ -1,16 +1,17 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, GraduationCap, Layers3, MessageSquareText, Plus } from "lucide-react";
 import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { SectionHeading } from "@/components/SectionHeading";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Portfolio",
   description:
     "Explore NeOMind internal flagship products and portfolio case studies including NeoLearn and NeO VoiceDesk.",
-};
+  path: "/portfolio",
+});
 
 const caseStudies = [
   {

@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BookOpenText, BrainCircuit, Clock, Sparkles } from "lucide-react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { SectionHeading } from "@/components/SectionHeading";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Insights",
   description:
     "NeOMind Insights is a coming-soon destination for AI, SaaS, automation, cloud, and digital transformation thinking.",
-};
+  path: "/insights",
+});
 
 const upcomingTopics = [
   "AI adoption strategy",

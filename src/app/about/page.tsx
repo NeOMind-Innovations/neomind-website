@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
 import { BrainCircuit, Compass, Eye, Lightbulb, ShieldCheck, Target, Users } from "lucide-react";
 import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { SectionHeading } from "@/components/SectionHeading";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "About",
   description:
     "Learn about NeOMind, THE NEOMIND INNOVATIONS LLP, its mission, vision, values, and purpose as an AI technology company.",
-};
+  path: "/about",
+});
 
 const values = [
   {

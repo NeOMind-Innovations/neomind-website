@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
 import { CalendarCheck, Mail, MessageSquare, Sparkles } from "lucide-react";
 import { ContactForm } from "@/components/ContactForm";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { SectionHeading } from "@/components/SectionHeading";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Contact",
   description:
     "Contact NeOMind for AI solutions, custom software development, SaaS product development, automation, cloud applications, and digital transformation consulting.",
-};
+  path: "/contact",
+});
 
 export default function ContactPage() {
   return (

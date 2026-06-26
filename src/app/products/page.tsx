@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -14,12 +13,14 @@ import { FadeIn } from "@/components/FadeIn";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { SectionHeading } from "@/components/SectionHeading";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Products",
   description:
     "Explore NeOMind flagship products NeoLearn and NeO VoiceDesk for intelligent learning and AI-enabled voice helpdesk operations.",
-};
+  path: "/products",
+});
 
 const products = [
   {

@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import {
   Building2,
   Factory,
@@ -14,12 +13,14 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { IndustryCard } from "@/components/IndustryCard";
 import { SectionHeading } from "@/components/SectionHeading";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Industries",
   description:
     "NeOMind supports education, healthcare, retail, manufacturing, government, real estate, finance, and startups with AI and software solutions.",
-};
+  path: "/industries",
+});
 
 const industries = [
   {

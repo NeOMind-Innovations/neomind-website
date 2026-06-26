@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import {
   AppWindow,
   BrainCircuit,
@@ -13,12 +12,14 @@ import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { SectionHeading } from "@/components/SectionHeading";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Services",
   description:
     "Explore NeOMind services including AI solutions, custom software, mobile apps, SaaS product development, AI helpdesk, automation, cloud apps, and digital transformation.",
-};
+  path: "/services",
+});
 
 const services = [
   {
