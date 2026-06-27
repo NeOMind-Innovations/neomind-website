@@ -1,4 +1,6 @@
+import { isIP } from "node:net";
 import { NextResponse } from "next/server";
+import { insertContactInquiry } from "@/lib/contactInquiries";
 
 type ContactInquiry = {
   name: string;
@@ -26,12 +28,14 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-async function storeContactInquiry(inquiry: ContactInquiry) {
-  // Placeholder persistence until an email provider or database is connected.
-  console.info("NeOMind contact inquiry received", {
-    ...inquiry,
-    receivedAt: new Date().toISOString(),
-  });
+function getIpAddress(request: Request) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  const candidate =
+    forwardedFor?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip")?.trim() ??
+    request.headers.get("cf-connecting-ip")?.trim();
+
+  return candidate && isIP(candidate) ? candidate : null;
 }
 
 export async function POST(request: Request) {
@@ -65,7 +69,16 @@ export async function POST(request: Request) {
       );
     }
 
-    await storeContactInquiry(inquiry);
+    await insertContactInquiry({
+      name: inquiry.name,
+      email: inquiry.email,
+      phone: inquiry.phone,
+      company: inquiry.company,
+      service_interest: inquiry.serviceInterest,
+      message: inquiry.message,
+      ip_address: getIpAddress(request),
+      user_agent: request.headers.get("user-agent"),
+    });
 
     return NextResponse.json({
       message: "Your inquiry has been received. NeOMind will follow up soon.",
