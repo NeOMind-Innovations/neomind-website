@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
+import MicrosoftClarity from "@/components/MicrosoftClarity";
 import {
   absoluteUrl,
   companyName,
@@ -176,6 +177,7 @@ export default function RootLayout({
         />
         {children}
         <GoogleAnalytics />
+        <MicrosoftClarity />
       </body>
     </html>
   );
