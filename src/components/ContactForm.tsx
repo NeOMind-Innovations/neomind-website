@@ -1,6 +1,10 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useMemo, useState } from "react";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
+
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+const isProduction = process.env.NODE_ENV === "production";
 
 const serviceOptions = [
   "AI Solutions",
@@ -36,11 +40,20 @@ export function ContactForm() {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const [turnstileDevFallback, setTurnstileDevFallback] = useState(false);
 
   const isFormComplete = useMemo(
     () => Object.values(formState).every((value) => value.trim().length > 0),
     [formState],
   );
+  const isTurnstileRequired =
+    isProduction || Boolean(turnstileSiteKey && !turnstileDevFallback);
+  const isSubmitDisabled =
+    !isFormComplete ||
+    isSubmitting ||
+    (isTurnstileRequired && !turnstileToken);
 
   function updateField(field: keyof FormState, value: string) {
     setFormState((current) => ({ ...current, [field]: value }));
@@ -50,12 +63,46 @@ export function ContactForm() {
     }
   }
 
+  const handleTurnstileToken = useCallback((token: string) => {
+    setTurnstileToken(token);
+    if (token) {
+      setTurnstileDevFallback(false);
+      setStatus("idle");
+      setStatusMessage("");
+    }
+  }, []);
+
+  const handleTurnstileError = useCallback(() => {
+    setTurnstileToken("");
+  }, []);
+
+  const handleTurnstileDevelopmentFallback = useCallback(() => {
+    setTurnstileToken("");
+    setTurnstileDevFallback(true);
+  }, []);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!isFormComplete) {
       setStatus("error");
       setStatusMessage("Please complete all required fields before submitting.");
+      return;
+    }
+
+    if (isTurnstileRequired && !turnstileToken) {
+      setStatus("error");
+      setStatusMessage(
+        "Please complete the security verification before submitting.",
+      );
+      return;
+    }
+
+    if (!turnstileSiteKey && isProduction) {
+      setStatus("error");
+      setStatusMessage(
+        "Security verification is unavailable. Please try again later.",
+      );
       return;
     }
 
@@ -69,7 +116,10 @@ export function ContactForm() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formState),
+        body: JSON.stringify({
+          ...formState,
+          turnstileToken,
+        }),
       });
       const result = (await response.json()) as {
         message?: string;
@@ -81,6 +131,9 @@ export function ContactForm() {
       }
 
       setFormState(initialFormState);
+      setTurnstileToken("");
+      setTurnstileDevFallback(false);
+      setTurnstileResetKey((current) => current + 1);
       setStatus("success");
       setStatusMessage(
         result.message ?? "Your inquiry has been received. NeOMind will follow up soon.",
@@ -184,6 +237,26 @@ export function ContactForm() {
           required
         />
       </label>
+      {turnstileSiteKey ? (
+        <div className="mt-5">
+          <TurnstileWidget
+            key={turnstileResetKey}
+            siteKey={turnstileSiteKey}
+            onTokenChange={handleTurnstileToken}
+            onError={handleTurnstileError}
+            onDevelopmentFallback={handleTurnstileDevelopmentFallback}
+          />
+        </div>
+      ) : !isProduction ? (
+        <p className="mt-5 text-xs text-slate-500" role="note">
+          Security verification is disabled locally because
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY is not configured.
+        </p>
+      ) : (
+        <p className="mt-5 text-sm text-red-700" role="alert">
+          Security verification is unavailable. Please try again later.
+        </p>
+      )}
       {statusMessage ? (
         <div
           className={`mt-5 rounded-md border px-4 py-3 text-sm ${
@@ -198,7 +271,7 @@ export function ContactForm() {
       ) : null}
       <button
         type="submit"
-        disabled={!isFormComplete || isSubmitting}
+        disabled={isSubmitDisabled}
         className="mt-6 w-full rounded-md bg-primary-blue px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:-translate-y-0.5 hover:bg-deep-navy hover:shadow-blue-300 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:hover:translate-y-0"
       >
         {isSubmitting ? "Sending..." : "Send Message"}

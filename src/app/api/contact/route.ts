@@ -2,6 +2,8 @@ import { isIP } from "node:net";
 import { NextResponse } from "next/server";
 import { sendContactInquiryEmails } from "@/lib/contactEmails";
 import { insertContactInquiry } from "@/lib/contactInquiries";
+import { checkContactRateLimit } from "@/lib/contactRateLimit";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 type ContactInquiry = {
   name: string;
@@ -10,6 +12,10 @@ type ContactInquiry = {
   company: string;
   serviceInterest: string;
   message: string;
+};
+
+type ContactRequest = ContactInquiry & {
+  turnstileToken: string;
 };
 
 const requiredFields: Array<keyof ContactInquiry> = [
@@ -40,8 +46,26 @@ function getIpAddress(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const ipAddress = getIpAddress(request);
+  const rateLimit = checkContactRateLimit(ipAddress ?? "unknown");
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        error:
+          "Too many inquiries were submitted. Please wait before trying again.",
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": rateLimit.retryAfter.toString(),
+        },
+      },
+    );
+  }
+
   try {
-    const body = (await request.json()) as Partial<ContactInquiry>;
+    const body = (await request.json()) as Partial<ContactRequest>;
     const inquiry: ContactInquiry = {
       name: normalizeValue(body.name),
       email: normalizeValue(body.email),
@@ -50,6 +74,7 @@ export async function POST(request: Request) {
       serviceInterest: normalizeValue(body.serviceInterest),
       message: normalizeValue(body.message),
     };
+    const turnstileToken = normalizeValue(body.turnstileToken);
 
     const missingFields = requiredFields.filter((field) => !inquiry[field]);
 
@@ -70,6 +95,22 @@ export async function POST(request: Request) {
       );
     }
 
+    const turnstileVerification = await verifyTurnstileToken(
+      turnstileToken,
+      ipAddress,
+    );
+
+    if (!turnstileVerification.success) {
+      return NextResponse.json(
+        {
+          error:
+            turnstileVerification.error ??
+            "Security verification failed. Please try again.",
+        },
+        { status: 400 },
+      );
+    }
+
     await insertContactInquiry({
       name: inquiry.name,
       email: inquiry.email,
@@ -77,7 +118,7 @@ export async function POST(request: Request) {
       company: inquiry.company,
       service_interest: inquiry.serviceInterest,
       message: inquiry.message,
-      ip_address: getIpAddress(request),
+      ip_address: ipAddress,
       user_agent: request.headers.get("user-agent"),
     });
 
