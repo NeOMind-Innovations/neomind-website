@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import { NextResponse } from "next/server";
+import { sendContactInquiryEmails } from "@/lib/contactEmails";
 import { insertContactInquiry } from "@/lib/contactInquiries";
 
 type ContactInquiry = {
@@ -79,6 +80,14 @@ export async function POST(request: Request) {
       ip_address: getIpAddress(request),
       user_agent: request.headers.get("user-agent"),
     });
+
+    try {
+      await sendContactInquiryEmails(inquiry);
+    } catch {
+      console.error(
+        "Contact inquiry was saved, but one or more email notifications failed.",
+      );
+    }
 
     return NextResponse.json({
       message: "Your inquiry has been received. NeOMind will follow up soon.",
