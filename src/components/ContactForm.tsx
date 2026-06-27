@@ -43,8 +43,7 @@ export function ContactForm() {
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
-  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
-  const [turnstileDevFallback, setTurnstileDevFallback] = useState(false);
+  const [turnstileError, setTurnstileError] = useState("");
 
   const isFormValid = useMemo(
     () =>
@@ -54,8 +53,7 @@ export function ContactForm() {
       formState.message.trim().length > 0,
     [formState],
   );
-  const isTurnstileRequired =
-    isProduction || Boolean(turnstileSiteKey && !turnstileDevFallback);
+  const isTurnstileRequired = isProduction || Boolean(turnstileSiteKey);
   const isSubmitDisabled =
     !isFormValid ||
     isSubmitting ||
@@ -71,20 +69,12 @@ export function ContactForm() {
 
   const handleTurnstileToken = useCallback((token: string) => {
     setTurnstileToken(token);
-    if (token) {
-      setTurnstileDevFallback(false);
-      setStatus("idle");
-      setStatusMessage("");
-    }
+    setTurnstileError("");
   }, []);
 
   const handleTurnstileError = useCallback(() => {
     setTurnstileToken("");
-  }, []);
-
-  const handleTurnstileDevelopmentFallback = useCallback(() => {
-    setTurnstileToken("");
-    setTurnstileDevFallback(true);
+    setTurnstileError("Please complete the security verification.");
   }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -99,10 +89,7 @@ export function ContactForm() {
     }
 
     if (isTurnstileRequired && !turnstileToken) {
-      setStatus("error");
-      setStatusMessage(
-        "Please complete the security verification before submitting.",
-      );
+      setTurnstileError("Please complete the security verification.");
       return;
     }
 
@@ -140,8 +127,7 @@ export function ContactForm() {
 
       setFormState(initialFormState);
       setTurnstileToken("");
-      setTurnstileDevFallback(false);
-      setTurnstileResetKey((current) => current + 1);
+      setTurnstileError("");
       setStatus("success");
       setStatusMessage(
         result.message ?? "Your inquiry has been received. NeOMind will follow up soon.",
@@ -246,12 +232,15 @@ export function ContactForm() {
       {turnstileSiteKey ? (
         <div className="mt-5">
           <TurnstileWidget
-            key={turnstileResetKey}
             siteKey={turnstileSiteKey}
             onTokenChange={handleTurnstileToken}
             onError={handleTurnstileError}
-            onDevelopmentFallback={handleTurnstileDevelopmentFallback}
           />
+          {turnstileError ? (
+            <p className="mt-2 text-sm text-red-700" role="alert">
+              {turnstileError}
+            </p>
+          ) : null}
         </div>
       ) : !isProduction ? (
         <p className="mt-5 text-xs text-slate-500" role="note">

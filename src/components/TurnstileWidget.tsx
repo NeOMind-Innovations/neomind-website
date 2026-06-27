@@ -6,8 +6,7 @@ import Script from "next/script";
 type TurnstileWidgetProps = {
   siteKey: string;
   onTokenChange: (token: string) => void;
-  onError: (message: string) => void;
-  onDevelopmentFallback: () => void;
+  onError: () => void;
 };
 
 type TurnstileApi = {
@@ -32,54 +31,14 @@ declare global {
   }
 }
 
-const turnstileLoadError =
-  "Security verification could not load. Please refresh and try again.";
-const turnstileTimeoutError =
-  "Security check could not load. Please refresh and try again.";
-const isProduction = process.env.NODE_ENV === "production";
-
 export function TurnstileWidget({
   siteKey,
   onTokenChange,
   onError,
-  onDevelopmentFallback,
 }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string>();
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const hasTokenRef = useRef(false);
   const [isReady, setIsReady] = useState(false);
-  const [widgetStatus, setWidgetStatus] = useState<
-    "loading" | "verified" | "error" | "skipped"
-  >("loading");
-  const [widgetError, setWidgetError] = useState("");
-
-  useEffect(() => {
-    timeoutRef.current = setTimeout(() => {
-      if (hasTokenRef.current) {
-        return;
-      }
-
-      onTokenChange("");
-
-      if (isProduction) {
-        setWidgetStatus("error");
-        setWidgetError(turnstileTimeoutError);
-        onError(turnstileTimeoutError);
-        return;
-      }
-
-      setWidgetStatus("skipped");
-      setWidgetError("");
-      onDevelopmentFallback();
-    }, 8_000);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [onDevelopmentFallback, onError, onTokenChange]);
 
   useEffect(() => {
     if (
@@ -93,33 +52,14 @@ export function TurnstileWidget({
 
     widgetIdRef.current = window.turnstile.render(containerRef.current, {
       sitekey: siteKey,
-      callback: (token) => {
-        hasTokenRef.current = true;
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-        setWidgetStatus("verified");
-        setWidgetError("");
-        onTokenChange(token);
-      },
+      callback: onTokenChange,
       "expired-callback": () => {
-        const message =
-          "Security verification expired. Please complete it again.";
-        hasTokenRef.current = false;
-        setWidgetStatus("error");
-        setWidgetError(message);
         onTokenChange("");
-        onError(message);
+        onError();
       },
       "error-callback": () => {
-        hasTokenRef.current = false;
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-        setWidgetStatus("error");
-        setWidgetError(turnstileLoadError);
         onTokenChange("");
-        onError(turnstileLoadError);
+        onError();
       },
       theme: "light",
       size: "flexible",
@@ -142,43 +82,10 @@ export function TurnstileWidget({
         onLoad={() => setIsReady(true)}
         onReady={() => setIsReady(true)}
         onError={() => {
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-          }
           onTokenChange("");
-
-          if (isProduction) {
-            setWidgetStatus("error");
-            setWidgetError(turnstileTimeoutError);
-            onError(turnstileTimeoutError);
-            return;
-          }
-
-          setWidgetStatus("skipped");
-          setWidgetError("");
-          onDevelopmentFallback();
+          onError();
         }}
       />
-      {widgetStatus === "loading" ? (
-        <p className="mb-2 text-sm text-slate-600" role="status">
-          Verifying security check...
-        </p>
-      ) : null}
-      {widgetStatus === "error" ? (
-        <p className="mb-2 text-sm text-red-700" role="alert">
-          {widgetError}
-        </p>
-      ) : null}
-      {widgetStatus === "verified" ? (
-        <p className="mb-2 text-sm text-teal" role="status">
-          Security check verified.
-        </p>
-      ) : null}
-      {widgetStatus === "skipped" ? (
-        <p className="mb-2 text-sm text-slate-600" role="status">
-          Security check skipped in development.
-        </p>
-      ) : null}
       <div
         ref={containerRef}
         className="min-h-[65px] w-full overflow-hidden"
