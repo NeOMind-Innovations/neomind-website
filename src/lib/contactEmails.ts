@@ -2,8 +2,9 @@ import "server-only";
 
 import { Resend } from "resend";
 
-const FROM_ADDRESS = "NeOMind <onboarding@resend.dev>";
-const SUPPORT_EMAIL = "support@neomindinnovations.in";
+const FROM_ADDRESS = "NeOMind <no-reply@neomindinnovations.in>";
+const DEFAULT_INTERNAL_LEAD_EMAIL = "neo.neolearn.ai@gmail.com";
+const WEBSITE_URL = "https://neomindinnovations.in";
 
 export type ContactEmailDetails = {
   name: string;
@@ -44,7 +45,7 @@ function emailShell(preheader: string, heading: string, content: string) {
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #e2e8f0;">
             <tr>
               <td style="background:#1e3a8a;padding:28px 32px;">
-                <div style="color:#ffffff;font-size:26px;font-weight:700;">NeOMind</div>
+                <div style="color:#ffffff;font-size:26px;font-weight:700;">NeOMind Innovations LLP</div>
                 <div style="margin-top:6px;color:#bfdbfe;font-size:14px;">Transforming Ideas into Intelligent Solutions</div>
               </td>
             </tr>
@@ -56,8 +57,8 @@ function emailShell(preheader: string, heading: string, content: string) {
             </tr>
             <tr>
               <td style="border-top:1px solid #e2e8f0;padding:20px 32px;color:#64748b;font-size:12px;line-height:1.6;">
-                THE NEOMIND INNOVATIONS LLP<br>
-                AI &bull; SaaS &bull; Automation &bull; Mobile Apps
+                NeOMind Innovations LLP<br>
+                <a href="${WEBSITE_URL}" style="color:#2563eb;text-decoration:none;">${WEBSITE_URL}</a>
               </td>
             </tr>
           </table>
@@ -139,11 +140,14 @@ Service interest: ${details.serviceInterest}
 Message: ${details.message}
 
 NeOMind
-Transforming Ideas into Intelligent Solutions`;
+Transforming Ideas into Intelligent Solutions
+${WEBSITE_URL}`;
 }
 
 export async function sendContactInquiryEmails(details: ContactEmailDetails) {
   const apiKey = process.env.RESEND_API_KEY;
+  const internalLeadEmail =
+    process.env.INTERNAL_LEAD_EMAIL?.trim() || DEFAULT_INTERNAL_LEAD_EMAIL;
 
   if (!apiKey) {
     throw new Error("Resend email delivery is not configured.");
@@ -153,7 +157,7 @@ export async function sendContactInquiryEmails(details: ContactEmailDetails) {
   const deliveries = await Promise.allSettled([
     resend.emails.send({
       from: FROM_ADDRESS,
-      to: SUPPORT_EMAIL,
+      to: internalLeadEmail,
       replyTo: details.email,
       subject: "New Website Inquiry - NeOMind",
       html: internalEmailHtml(details),
@@ -162,7 +166,7 @@ export async function sendContactInquiryEmails(details: ContactEmailDetails) {
     resend.emails.send({
       from: FROM_ADDRESS,
       to: details.email,
-      replyTo: SUPPORT_EMAIL,
+      replyTo: internalLeadEmail,
       subject: "Thank you for contacting NeOMind",
       html: acknowledgementEmailHtml(details),
       text: acknowledgementEmailText(details),
