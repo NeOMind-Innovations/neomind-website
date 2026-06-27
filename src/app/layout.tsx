@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 import {
   absoluteUrl,
   companyName,
@@ -174,6 +175,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
         {children}
+        <GoogleAnalytics />
       </body>
     </html>
   );
