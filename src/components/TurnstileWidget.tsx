@@ -105,12 +105,17 @@ export function TurnstileWidget({
       "expired-callback": () => {
         const message =
           "Security verification expired. Please complete it again.";
+        hasTokenRef.current = false;
         setWidgetStatus("error");
         setWidgetError(message);
         onTokenChange("");
         onError(message);
       },
       "error-callback": () => {
+        hasTokenRef.current = false;
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
         setWidgetStatus("error");
         setWidgetError(turnstileLoadError);
         onTokenChange("");
@@ -137,9 +142,21 @@ export function TurnstileWidget({
         onLoad={() => setIsReady(true)}
         onReady={() => setIsReady(true)}
         onError={() => {
-          setWidgetStatus("error");
-          setWidgetError(turnstileLoadError);
-          onError(turnstileLoadError);
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+          onTokenChange("");
+
+          if (isProduction) {
+            setWidgetStatus("error");
+            setWidgetError(turnstileTimeoutError);
+            onError(turnstileTimeoutError);
+            return;
+          }
+
+          setWidgetStatus("skipped");
+          setWidgetError("");
+          onDevelopmentFallback();
         }}
       />
       {widgetStatus === "loading" ? (
@@ -150,6 +167,11 @@ export function TurnstileWidget({
       {widgetStatus === "error" ? (
         <p className="mb-2 text-sm text-red-700" role="alert">
           {widgetError}
+        </p>
+      ) : null}
+      {widgetStatus === "verified" ? (
+        <p className="mb-2 text-sm text-teal" role="status">
+          Security check verified.
         </p>
       ) : null}
       {widgetStatus === "skipped" ? (

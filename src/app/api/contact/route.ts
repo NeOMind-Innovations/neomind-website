@@ -21,8 +21,6 @@ type ContactRequest = ContactInquiry & {
 const requiredFields: Array<keyof ContactInquiry> = [
   "name",
   "email",
-  "phone",
-  "company",
   "serviceInterest",
   "message",
 ];

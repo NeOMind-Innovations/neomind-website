@@ -35,6 +35,8 @@ const initialFormState: FormState = {
   message: "",
 };
 
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function ContactForm() {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
@@ -44,14 +46,18 @@ export function ContactForm() {
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [turnstileDevFallback, setTurnstileDevFallback] = useState(false);
 
-  const isFormComplete = useMemo(
-    () => Object.values(formState).every((value) => value.trim().length > 0),
+  const isFormValid = useMemo(
+    () =>
+      formState.name.trim().length > 0 &&
+      emailPattern.test(formState.email.trim()) &&
+      formState.serviceInterest.trim().length > 0 &&
+      formState.message.trim().length > 0,
     [formState],
   );
   const isTurnstileRequired =
     isProduction || Boolean(turnstileSiteKey && !turnstileDevFallback);
   const isSubmitDisabled =
-    !isFormComplete ||
+    !isFormValid ||
     isSubmitting ||
     (isTurnstileRequired && !turnstileToken);
 
@@ -84,9 +90,11 @@ export function ContactForm() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!isFormComplete) {
+    if (!isFormValid) {
       setStatus("error");
-      setStatusMessage("Please complete all required fields before submitting.");
+      setStatusMessage(
+        "Please complete all required fields with a valid email address.",
+      );
       return;
     }
 
@@ -192,7 +200,6 @@ export function ContactForm() {
             onChange={(event) => updateField("phone", event.target.value)}
             className="rounded-md border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
             placeholder="+91 98765 43210"
-            required
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-charcoal">
@@ -204,7 +211,6 @@ export function ContactForm() {
             onChange={(event) => updateField("company", event.target.value)}
             className="rounded-md border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
             placeholder="Company name"
-            required
           />
         </label>
       </div>
