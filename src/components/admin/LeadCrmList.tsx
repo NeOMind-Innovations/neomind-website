@@ -1,8 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarClock, X } from "lucide-react";
+import { CalendarClock, LoaderCircle, Sparkles, X } from "lucide-react";
 import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
+
+type LeadAiInsight = {
+  id: string;
+  inquiry_id: string;
+  lead_temperature: "hot" | "warm" | "cold";
+  lead_score: number;
+  summary: string;
+  suggested_service: string;
+  estimated_value: string;
+  recommended_next_step: string;
+  suggested_reply: string;
+  proposal_outline: string;
+  generated_at: string;
+  updated_at: string;
+};
 
 type Lead = {
   id: string;
@@ -19,6 +34,7 @@ type Lead = {
   internal_notes: string | null;
   created_at: string;
   ip_address: string | null;
+  ai_insight: LeadAiInsight | null;
 };
 
 type LeadCrmListProps = {
@@ -44,6 +60,23 @@ const priorityStyles: Record<string, string> = {
   low: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
 };
 
+const temperatureStyles = {
+  hot: "bg-red-50 text-red-700 ring-red-600/20",
+  warm: "bg-amber-50 text-amber-700 ring-amber-600/20",
+  cold: "bg-blue-50 text-blue-700 ring-blue-600/20",
+};
+
+const serviceIcons: Record<string, string> = {
+  "AI Solutions": "🤖",
+  "Custom Software Development": "💻",
+  "Mobile App Development": "📱",
+  "SaaS Product Development": "☁️",
+  "AI Helpdesk Solutions": "🎧",
+  "Business Automation": "⚙️",
+  "Cloud Applications": "☁️",
+  "Digital Transformation": "🚀",
+};
+
 function formatLabel(value: string) {
   return value
     .split("_")
@@ -63,6 +96,43 @@ function formatDate(value: string) {
     timeStyle: "short",
     timeZone: "Asia/Kolkata",
   }).format(date);
+}
+
+function formatRelativeAge(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Recently";
+  }
+
+  const elapsedSeconds = Math.max(
+    0,
+    Math.floor((Date.now() - date.getTime()) / 1000),
+  );
+
+  if (elapsedSeconds < 60) {
+    return "Just now";
+  }
+
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+
+  if (elapsedMinutes < 60) {
+    return `${elapsedMinutes} ${elapsedMinutes === 1 ? "minute" : "minutes"} ago`;
+  }
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+
+  if (elapsedHours < 24) {
+    return `${elapsedHours} ${elapsedHours === 1 ? "hour" : "hours"} ago`;
+  }
+
+  const elapsedDays = Math.floor(elapsedHours / 24);
+
+  if (elapsedDays === 1) {
+    return "Yesterday";
+  }
+
+  return `${elapsedDays} days ago`;
 }
 
 function formatFollowUpDate(value: string | null) {
@@ -108,13 +178,26 @@ function displayValue(value: string | null) {
   return value || "Not provided";
 }
 
+function getPriorityLabel(priority: string) {
+  if (priority === "high") return "🔥 Hot";
+  if (priority === "low") return "Low Priority";
+  return "Medium Priority";
+}
+
+function getServiceIcon(service: string | null) {
+  return (service && serviceIcons[service]) || "💼";
+}
+
 export function LeadCrmList({
   leads,
   returnTo,
   statuses,
   priorities,
 }: LeadCrmListProps) {
+  const [leadItems, setLeadItems] = useState(leads);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [isGeneratingInsight, setIsGeneratingInsight] = useState(false);
+  const [aiError, setAiError] = useState("");
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -123,12 +206,64 @@ export function LeadCrmList({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    setAiError("");
+    setIsGeneratingInsight(false);
     setSelectedLead(lead);
   }
 
   function closeLead() {
     setSelectedLead(null);
   }
+
+  async function generateAiInsight() {
+    if (!selectedLead || isGeneratingInsight) {
+      return;
+    }
+
+    setIsGeneratingInsight(true);
+    setAiError("");
+
+    try {
+      const response = await fetch("/api/admin/leads/ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ inquiryId: selectedLead.id }),
+      });
+      const result = (await response.json()) as {
+        insight?: LeadAiInsight;
+        error?: string;
+      };
+
+      if (!response.ok || !result.insight) {
+        throw new Error(result.error ?? "AI insight generation failed.");
+      }
+
+      setLeadItems((current) =>
+        current.map((lead) =>
+          lead.id === selectedLead.id
+            ? { ...lead, ai_insight: result.insight ?? null }
+            : lead,
+        ),
+      );
+      setSelectedLead((current) =>
+        current ? { ...current, ai_insight: result.insight ?? null } : current,
+      );
+    } catch (error) {
+      setAiError(
+        error instanceof Error
+          ? error.message
+          : "AI insight generation failed.",
+      );
+    } finally {
+      setIsGeneratingInsight(false);
+    }
+  }
+
+  useEffect(() => {
+    setLeadItems(leads);
+  }, [leads]);
 
   useEffect(() => {
     if (!selectedLead) {
@@ -157,19 +292,26 @@ export function LeadCrmList({
   return (
     <>
       <div className="space-y-4">
-        {leads.map((lead) => {
+        {leadItems.map((lead) => {
           const isOverdue = isOverdueFollowUp(lead);
 
           return (
             <article
               key={lead.id}
-              className={`rounded-xl bg-white p-5 shadow-sm transition hover:shadow-md ${
+              className={`relative overflow-hidden rounded-xl bg-white p-5 shadow-sm transition hover:shadow-md ${
                 isOverdue
                   ? "border border-red-300 ring-2 ring-red-100"
                   : "border border-slate-200"
               }`}
             >
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <button
+                type="button"
+                onClick={() => openLead(lead)}
+                className="absolute inset-0 z-0 cursor-pointer rounded-xl focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                aria-label={`View ${lead.name}`}
+              />
+              <div className="pointer-events-none relative z-10">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2.5">
                     <h2 className="text-lg font-bold text-charcoal">
@@ -187,7 +329,7 @@ export function LeadCrmList({
                         priorityStyles[lead.priority] ?? priorityStyles.medium
                       }`}
                     >
-                      {lead.priority} priority
+                      {getPriorityLabel(lead.priority)}
                     </span>
                     {isOverdue ? (
                       <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">
@@ -196,7 +338,11 @@ export function LeadCrmList({
                     ) : null}
                   </div>
                   <p className="mt-1.5 text-xs font-medium text-slate-500">
-                    Received {formatDate(lead.created_at)}
+                    <span suppressHydrationWarning>
+                      {formatRelativeAge(lead.created_at)}
+                    </span>
+                    {" · "}
+                    {formatDate(lead.created_at)}
                   </p>
                 </div>
 
@@ -205,9 +351,9 @@ export function LeadCrmList({
                   phone={lead.phone}
                   onView={() => openLead(lead)}
                 />
-              </div>
+                </div>
 
-              <dl className="mt-5 grid gap-x-6 gap-y-3 border-y border-slate-100 py-4 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                <dl className="mt-5 grid gap-x-6 gap-y-3 border-y border-slate-100 py-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
                 <div className="min-w-0">
                   <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                     Email
@@ -236,7 +382,10 @@ export function LeadCrmList({
                   <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                     Service
                   </dt>
-                  <dd className="mt-1 truncate text-slate-700">
+                  <dd className="mt-1 flex items-center gap-1.5 truncate text-slate-700">
+                    <span aria-hidden="true">
+                      {getServiceIcon(lead.service_interest)}
+                    </span>
                     {displayValue(lead.service_interest)}
                   </dd>
                 </div>
@@ -255,11 +404,12 @@ export function LeadCrmList({
                     {formatFollowUpDate(lead.follow_up_date)}
                   </dd>
                 </div>
-              </dl>
+                </dl>
 
-              <p className="mt-4 line-clamp-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">
-                {lead.message}
-              </p>
+                <p className="mt-4 line-clamp-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">
+                  {lead.message}
+                </p>
+              </div>
             </article>
           );
         })}
@@ -293,7 +443,11 @@ export function LeadCrmList({
                   {selectedLead.name}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Received {formatDate(selectedLead.created_at)}
+                  <span suppressHydrationWarning>
+                    {formatRelativeAge(selectedLead.created_at)}
+                  </span>
+                  {" · "}
+                  {formatDate(selectedLead.created_at)}
                 </p>
               </div>
               <button
@@ -322,7 +476,7 @@ export function LeadCrmList({
                     priorityStyles.medium
                   }`}
                 >
-                  {selectedLead.priority} priority
+                  {getPriorityLabel(selectedLead.priority)}
                 </span>
               </div>
 
@@ -353,7 +507,10 @@ export function LeadCrmList({
                     <dt className="font-semibold text-slate-500">
                       Service interest
                     </dt>
-                    <dd className="mt-1 break-words text-charcoal">
+                    <dd className="mt-1 flex items-center gap-1.5 break-words text-charcoal">
+                      <span aria-hidden="true">
+                        {getServiceIcon(selectedLead.service_interest)}
+                      </span>
                       {displayValue(selectedLead.service_interest)}
                     </dd>
                   </div>
@@ -380,6 +537,153 @@ export function LeadCrmList({
                     {selectedLead.message}
                   </p>
                 </div>
+              </section>
+
+              <section className="mt-7 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-blue-50 p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles
+                        size={18}
+                        className="text-violet-600"
+                        aria-hidden="true"
+                      />
+                      <h3 className="text-sm font-bold text-charcoal">
+                        AI Lead Assistant
+                      </h3>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Qualification guidance generated from the inquiry and CRM
+                      context.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={generateAiInsight}
+                    disabled={isGeneratingInsight}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-wait disabled:bg-violet-300"
+                  >
+                    {isGeneratingInsight ? (
+                      <LoaderCircle
+                        size={15}
+                        className="animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Sparkles size={15} aria-hidden="true" />
+                    )}
+                    {isGeneratingInsight
+                      ? "Generating..."
+                      : selectedLead.ai_insight
+                        ? "Regenerate AI Insight"
+                        : "Generate AI Insight"}
+                  </button>
+                </div>
+
+                {aiError ? (
+                  <p
+                    className="mt-4 rounded-lg border border-red-200 bg-white px-3 py-2.5 text-sm text-red-700"
+                    role="alert"
+                  >
+                    {aiError}
+                  </p>
+                ) : null}
+
+                {selectedLead.ai_insight ? (
+                  <div className="mt-5 space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border border-white/80 bg-white p-3 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Lead score
+                        </p>
+                        <p className="mt-1 text-2xl font-bold text-charcoal">
+                          {selectedLead.ai_insight.lead_score}
+                          <span className="text-sm font-medium text-slate-400">
+                            /100
+                          </span>
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-white/80 bg-white p-3 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Temperature
+                        </p>
+                        <span
+                          className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ring-inset ${
+                            temperatureStyles[
+                              selectedLead.ai_insight.lead_temperature
+                            ]
+                          }`}
+                        >
+                          {selectedLead.ai_insight.lead_temperature}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Summary
+                      </h4>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                        {selectedLead.ai_insight.summary}
+                      </p>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Suggested service
+                        </h4>
+                        <p className="mt-2 text-sm font-medium text-charcoal">
+                          {selectedLead.ai_insight.suggested_service}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Estimated value
+                        </h4>
+                        <p className="mt-2 text-sm font-medium text-charcoal">
+                          {selectedLead.ai_insight.estimated_value}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Recommended next step
+                      </h4>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                        {selectedLead.ai_insight.recommended_next_step}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Suggested reply
+                      </h4>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                        {selectedLead.ai_insight.suggested_reply}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Proposal outline
+                      </h4>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                        {selectedLead.ai_insight.proposal_outline}
+                      </p>
+                    </div>
+
+                    <p className="text-xs text-slate-500">
+                      Generated{" "}
+                      {formatDate(selectedLead.ai_insight.generated_at)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-4 rounded-lg border border-dashed border-violet-200 bg-white/70 px-4 py-5 text-center text-sm text-slate-600">
+                    AI insight not generated yet.
+                  </p>
+                )}
               </section>
 
               <form

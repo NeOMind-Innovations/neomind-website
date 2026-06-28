@@ -30,7 +30,10 @@ export function LeadQuickActions({
     "inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-primary-blue hover:text-primary-blue disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400";
 
   return (
-    <div className="flex flex-wrap gap-2" aria-label="Lead quick actions">
+    <div
+      className="pointer-events-auto relative z-20 flex flex-wrap gap-2"
+      aria-label="Lead quick actions"
+    >
       <button
         type="button"
         onClick={onView}

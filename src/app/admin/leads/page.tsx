@@ -79,6 +79,17 @@ function buildReturnTo(filters: LeadFilters) {
   return query ? `/admin/leads?${query}` : "/admin/leads";
 }
 
+function buildKpiHref(filters: LeadFilters, status: keyof LeadKpis) {
+  const params = new URLSearchParams();
+
+  if (status !== "total") params.set("status", status);
+  if (filters.service) params.set("service", filters.service);
+  if (filters.search) params.set("search", filters.search);
+
+  const query = params.toString();
+  return query ? `/admin/leads?${query}` : "/admin/leads";
+}
+
 function LoginScreen({
   hasError,
   isConfigured,
@@ -226,9 +237,16 @@ export default async function AdminLeadsPage({
           aria-label="Lead performance summary"
         >
           {kpiCards.map((card) => (
-            <div
+            <Link
               key={card.key}
-              className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              href={buildKpiHref(filters, card.key)}
+              className={`relative overflow-hidden rounded-xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-blue hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+                (card.key === "total" && !filters.status) ||
+                filters.status === card.key
+                  ? "border-primary-blue ring-1 ring-primary-blue"
+                  : "border-slate-200"
+              }`}
+              aria-label={`Filter leads by ${card.label}`}
             >
               <span
                 className={`absolute inset-x-0 top-0 h-1 ${card.accent}`}
@@ -240,7 +258,7 @@ export default async function AdminLeadsPage({
               <p className="mt-1 text-xs font-semibold text-slate-500">
                 {card.label}
               </p>
-            </div>
+            </Link>
           ))}
         </section>
 

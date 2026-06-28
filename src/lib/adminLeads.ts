@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { LeadAiInsight } from "@/lib/leadAiInsights";
+
 export const leadStatuses = [
   "new",
   "contacted",
@@ -35,6 +37,7 @@ type RawAdminLead = {
   created_at: string;
   ip_address: string | null;
   lead_metadata: LeadMetadataRecord | LeadMetadataRecord[] | null;
+  lead_ai_insights: LeadAiInsight | LeadAiInsight[] | null;
 };
 
 export type AdminLead = {
@@ -53,6 +56,7 @@ export type AdminLead = {
   internal_notes: string | null;
   created_at: string;
   ip_address: string | null;
+  ai_insight: LeadAiInsight | null;
 };
 
 export type LeadFilters = {
@@ -99,6 +103,12 @@ function getLeadMetadata(
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
+function getLeadAiInsight(
+  value: RawAdminLead["lead_ai_insights"],
+): LeadAiInsight | null {
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
 function normalizeLead(rawLead: RawAdminLead): AdminLead {
   const metadata = getLeadMetadata(rawLead.lead_metadata);
   const fallbackStatus =
@@ -126,6 +136,7 @@ function normalizeLead(rawLead: RawAdminLead): AdminLead {
     internal_notes: metadata?.internal_notes ?? null,
     created_at: rawLead.created_at,
     ip_address: rawLead.ip_address,
+    ai_insight: getLeadAiInsight(rawLead.lead_ai_insights),
   };
 }
 
@@ -146,7 +157,7 @@ export async function getAdminLeadDashboard(filters: LeadFilters) {
   const { baseUrl, serviceRoleKey } = getSupabaseAdminConfig();
   const params = new URLSearchParams({
     select:
-      "id,name,email,phone,company,service_interest,message,status,created_at,ip_address,lead_metadata(priority,follow_up_date,assigned_to,crm_status,internal_notes)",
+      "id,name,email,phone,company,service_interest,message,status,created_at,ip_address,lead_metadata(priority,follow_up_date,assigned_to,crm_status,internal_notes),lead_ai_insights(id,inquiry_id,lead_temperature,lead_score,summary,suggested_service,estimated_value,recommended_next_step,suggested_reply,proposal_outline,generated_at,updated_at)",
     order: "created_at.desc",
     limit: "5000",
   });
