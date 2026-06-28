@@ -192,13 +192,13 @@ export default async function AdminLeadsPage({
   }
 
   return (
-    <main className="min-h-screen bg-light-gray">
-      <header className="border-b border-slate-200 bg-white">
+    <main className="min-h-screen bg-light-gray dark:bg-slate-950">
+      <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-6 lg:px-8">
           <div>
             <Link
               href="/"
-              className="text-lg font-bold tracking-tight text-deep-navy"
+              className="text-lg font-bold tracking-tight text-deep-navy dark:text-white"
             >
               NeO<span className="text-primary-blue">Mind</span>
             </Link>
@@ -223,7 +223,7 @@ export default async function AdminLeadsPage({
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-blue">
               Contact inquiries
             </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-charcoal">
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-charcoal dark:text-white">
               Lead dashboard
             </h1>
           </div>
@@ -240,7 +240,7 @@ export default async function AdminLeadsPage({
             <Link
               key={card.key}
               href={buildKpiHref(filters, card.key)}
-              className={`relative overflow-hidden rounded-xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-blue hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+              className={`relative overflow-hidden rounded-xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-blue hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-100 dark:bg-slate-900 ${
                 (card.key === "total" && !filters.status) ||
                 filters.status === card.key
                   ? "border-primary-blue ring-1 ring-primary-blue"
@@ -252,7 +252,7 @@ export default async function AdminLeadsPage({
                 className={`absolute inset-x-0 top-0 h-1 ${card.accent}`}
                 aria-hidden="true"
               />
-              <p className="text-2xl font-bold tracking-tight text-charcoal">
+              <p className="text-2xl font-bold tracking-tight text-charcoal dark:text-white">
                 {kpis[card.key]}
               </p>
               <p className="mt-1 text-xs font-semibold text-slate-500">
@@ -265,7 +265,7 @@ export default async function AdminLeadsPage({
         <form
           action="/admin/leads"
           method="get"
-          className="mt-7 grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-[1fr_1fr_1.4fr_auto]"
+          className="mt-7 grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-[1fr_1fr_1.4fr_auto]"
         >
           <label className="grid gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Status

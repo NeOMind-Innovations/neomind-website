@@ -8,6 +8,8 @@ import {
   isLeadStatus,
   upsertLeadMetadata,
 } from "@/lib/adminLeads";
+import { getLeadContextForAi } from "@/lib/leadAiInsights";
+import { recordLeadTimelineEvent } from "@/lib/leadSalesCopilot";
 
 function getRedirectUrl(request: Request, returnTo: FormDataEntryValue | null) {
   const fallback = new URL("/admin/leads", request.url);
@@ -54,6 +56,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const previous = await getLeadContextForAi(id);
     await upsertLeadMetadata({
       inquiryId: id,
       status,
@@ -61,6 +64,39 @@ export async function POST(request: Request) {
       followUpDate,
       internalNotes,
     });
+    const timelineEvents: Array<Promise<void>> = [];
+
+    if (previous.crm_status !== status) {
+      timelineEvents.push(
+        recordLeadTimelineEvent(
+          id,
+          "Status Changed",
+          `${previous.crm_status} → ${status}`,
+        ),
+      );
+    }
+
+    if (previous.priority !== priority) {
+      timelineEvents.push(
+        recordLeadTimelineEvent(
+          id,
+          "Priority Changed",
+          `${previous.priority} → ${priority}`,
+        ),
+      );
+    }
+
+    if (previous.notes.trim() !== internalNotes.trim()) {
+      timelineEvents.push(
+        recordLeadTimelineEvent(
+          id,
+          "Notes Updated",
+          "Internal notes were updated.",
+        ),
+      );
+    }
+
+    await Promise.allSettled(timelineEvents);
     redirectUrl.searchParams.set("updated", "1");
   } catch {
     redirectUrl.searchParams.set("updateError", "1");

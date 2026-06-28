@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarClock, LoaderCircle, Sparkles, X } from "lucide-react";
+import { CalendarClock, X } from "lucide-react";
 import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
+import { LeadSalesCopilot } from "@/components/admin/LeadSalesCopilot";
 
 type LeadAiInsight = {
   id: string;
@@ -58,12 +59,6 @@ const priorityStyles: Record<string, string> = {
   high: "bg-red-50 text-red-700 ring-red-600/20",
   medium: "bg-amber-50 text-amber-700 ring-amber-600/20",
   low: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-};
-
-const temperatureStyles = {
-  hot: "bg-red-50 text-red-700 ring-red-600/20",
-  warm: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  cold: "bg-blue-50 text-blue-700 ring-blue-600/20",
 };
 
 const serviceIcons: Record<string, string> = {
@@ -196,8 +191,6 @@ export function LeadCrmList({
 }: LeadCrmListProps) {
   const [leadItems, setLeadItems] = useState(leads);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [isGeneratingInsight, setIsGeneratingInsight] = useState(false);
-  const [aiError, setAiError] = useState("");
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -206,8 +199,6 @@ export function LeadCrmList({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    setAiError("");
-    setIsGeneratingInsight(false);
     setSelectedLead(lead);
   }
 
@@ -215,50 +206,17 @@ export function LeadCrmList({
     setSelectedLead(null);
   }
 
-  async function generateAiInsight() {
-    if (!selectedLead || isGeneratingInsight) {
-      return;
-    }
-
-    setIsGeneratingInsight(true);
-    setAiError("");
-
-    try {
-      const response = await fetch("/api/admin/leads/ai", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ inquiryId: selectedLead.id }),
-      });
-      const result = (await response.json()) as {
-        insight?: LeadAiInsight;
-        error?: string;
-      };
-
-      if (!response.ok || !result.insight) {
-        throw new Error(result.error ?? "AI insight generation failed.");
-      }
-
-      setLeadItems((current) =>
-        current.map((lead) =>
-          lead.id === selectedLead.id
-            ? { ...lead, ai_insight: result.insight ?? null }
-            : lead,
-        ),
-      );
-      setSelectedLead((current) =>
-        current ? { ...current, ai_insight: result.insight ?? null } : current,
-      );
-    } catch (error) {
-      setAiError(
-        error instanceof Error
-          ? error.message
-          : "AI insight generation failed.",
-      );
-    } finally {
-      setIsGeneratingInsight(false);
-    }
+  function handleInsightUpdated(insight: LeadAiInsight) {
+    setLeadItems((current) =>
+      current.map((lead) =>
+        lead.id === insight.inquiry_id
+          ? { ...lead, ai_insight: insight }
+          : lead,
+      ),
+    );
+    setSelectedLead((current) =>
+      current ? { ...current, ai_insight: insight } : current,
+    );
   }
 
   useEffect(() => {
@@ -298,10 +256,10 @@ export function LeadCrmList({
           return (
             <article
               key={lead.id}
-              className={`relative overflow-hidden rounded-xl bg-white p-5 shadow-sm transition hover:shadow-md ${
+              className={`relative overflow-hidden rounded-xl bg-white p-5 shadow-sm transition hover:shadow-md dark:bg-slate-900 ${
                 isOverdue
                   ? "border border-red-300 ring-2 ring-red-100"
-                  : "border border-slate-200"
+                  : "border border-slate-200 dark:border-slate-800"
               }`}
             >
               <button
@@ -314,7 +272,7 @@ export function LeadCrmList({
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <h2 className="text-lg font-bold text-charcoal">
+                    <h2 className="text-lg font-bold text-charcoal dark:text-white">
                       {lead.name}
                     </h2>
                     <span
@@ -353,12 +311,12 @@ export function LeadCrmList({
                 />
                 </div>
 
-                <dl className="mt-5 grid gap-x-6 gap-y-3 border-y border-slate-100 py-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
+                <dl className="mt-5 grid gap-x-6 gap-y-3 border-y border-slate-100 py-4 text-sm dark:border-slate-800 sm:grid-cols-2 xl:grid-cols-5">
                 <div className="min-w-0">
                   <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                     Email
                   </dt>
-                  <dd className="mt-1 truncate text-slate-700" title={lead.email}>
+                  <dd className="mt-1 truncate text-slate-700 dark:text-slate-200" title={lead.email}>
                     {lead.email}
                   </dd>
                 </div>
@@ -366,7 +324,7 @@ export function LeadCrmList({
                   <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                     Phone
                   </dt>
-                  <dd className="mt-1 truncate text-slate-700">
+                  <dd className="mt-1 truncate text-slate-700 dark:text-slate-200">
                     {displayValue(lead.phone)}
                   </dd>
                 </div>
@@ -374,7 +332,7 @@ export function LeadCrmList({
                   <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                     Company
                   </dt>
-                  <dd className="mt-1 truncate text-slate-700">
+                  <dd className="mt-1 truncate text-slate-700 dark:text-slate-200">
                     {displayValue(lead.company)}
                   </dd>
                 </div>
@@ -382,7 +340,7 @@ export function LeadCrmList({
                   <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                     Service
                   </dt>
-                  <dd className="mt-1 flex items-center gap-1.5 truncate text-slate-700">
+                  <dd className="mt-1 flex items-center gap-1.5 truncate text-slate-700 dark:text-slate-200">
                     <span aria-hidden="true">
                       {getServiceIcon(lead.service_interest)}
                     </span>
@@ -406,7 +364,7 @@ export function LeadCrmList({
                 </div>
                 </dl>
 
-                <p className="mt-4 line-clamp-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">
+                <p className="mt-4 line-clamp-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">
                   {lead.message}
                 </p>
               </div>
@@ -429,16 +387,16 @@ export function LeadCrmList({
             role="dialog"
             aria-modal="true"
             aria-labelledby="lead-drawer-title"
-            className="flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl"
+            className="flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl dark:bg-slate-950"
           >
-            <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-7">
+            <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 dark:border-slate-800 sm:px-7">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-blue">
                   Lead details
                 </p>
                 <h2
                   id="lead-drawer-title"
-                  className="mt-1 truncate text-2xl font-bold tracking-tight text-charcoal"
+                  className="mt-1 truncate text-2xl font-bold tracking-tight text-charcoal dark:text-white"
                 >
                   {selectedLead.name}
                 </h2>
@@ -484,7 +442,7 @@ export function LeadCrmList({
                 <h3 className="text-sm font-bold text-charcoal">
                   Inquiry details
                 </h3>
-                <dl className="mt-3 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
+                <dl className="mt-3 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2">
                   <div>
                     <dt className="font-semibold text-slate-500">Email</dt>
                     <dd className="mt-1 break-words text-charcoal">
@@ -533,164 +491,22 @@ export function LeadCrmList({
                   <h3 className="text-sm font-semibold text-slate-500">
                     Full message
                   </h3>
-                  <p className="mt-2 whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700">
+                  <p className="mt-2 whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
                     {selectedLead.message}
                   </p>
                 </div>
               </section>
 
-              <section className="mt-7 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-blue-50 p-4 sm:p-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Sparkles
-                        size={18}
-                        className="text-violet-600"
-                        aria-hidden="true"
-                      />
-                      <h3 className="text-sm font-bold text-charcoal">
-                        AI Lead Assistant
-                      </h3>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Qualification guidance generated from the inquiry and CRM
-                      context.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={generateAiInsight}
-                    disabled={isGeneratingInsight}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-wait disabled:bg-violet-300"
-                  >
-                    {isGeneratingInsight ? (
-                      <LoaderCircle
-                        size={15}
-                        className="animate-spin"
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <Sparkles size={15} aria-hidden="true" />
-                    )}
-                    {isGeneratingInsight
-                      ? "Generating..."
-                      : selectedLead.ai_insight
-                        ? "Regenerate AI Insight"
-                        : "Generate AI Insight"}
-                  </button>
-                </div>
-
-                {aiError ? (
-                  <p
-                    className="mt-4 rounded-lg border border-red-200 bg-white px-3 py-2.5 text-sm text-red-700"
-                    role="alert"
-                  >
-                    {aiError}
-                  </p>
-                ) : null}
-
-                {selectedLead.ai_insight ? (
-                  <div className="mt-5 space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-lg border border-white/80 bg-white p-3 shadow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          Lead score
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-charcoal">
-                          {selectedLead.ai_insight.lead_score}
-                          <span className="text-sm font-medium text-slate-400">
-                            /100
-                          </span>
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-white/80 bg-white p-3 shadow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          Temperature
-                        </p>
-                        <span
-                          className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ring-inset ${
-                            temperatureStyles[
-                              selectedLead.ai_insight.lead_temperature
-                            ]
-                          }`}
-                        >
-                          {selectedLead.ai_insight.lead_temperature}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
-                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Summary
-                      </h4>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                        {selectedLead.ai_insight.summary}
-                      </p>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          Suggested service
-                        </h4>
-                        <p className="mt-2 text-sm font-medium text-charcoal">
-                          {selectedLead.ai_insight.suggested_service}
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          Estimated value
-                        </h4>
-                        <p className="mt-2 text-sm font-medium text-charcoal">
-                          {selectedLead.ai_insight.estimated_value}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
-                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Recommended next step
-                      </h4>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                        {selectedLead.ai_insight.recommended_next_step}
-                      </p>
-                    </div>
-
-                    <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
-                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Suggested reply
-                      </h4>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                        {selectedLead.ai_insight.suggested_reply}
-                      </p>
-                    </div>
-
-                    <div className="rounded-lg border border-white/80 bg-white p-4 shadow-sm">
-                      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Proposal outline
-                      </h4>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                        {selectedLead.ai_insight.proposal_outline}
-                      </p>
-                    </div>
-
-                    <p className="text-xs text-slate-500">
-                      Generated{" "}
-                      {formatDate(selectedLead.ai_insight.generated_at)}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="mt-4 rounded-lg border border-dashed border-violet-200 bg-white/70 px-4 py-5 text-center text-sm text-slate-600">
-                    AI insight not generated yet.
-                  </p>
-                )}
-              </section>
+              <LeadSalesCopilot
+                lead={selectedLead}
+                onInsightUpdated={handleInsightUpdated}
+              />
 
               <form
                 key={selectedLead.id}
                 action="/api/admin/leads"
                 method="post"
-                className="mt-7 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5"
+                className="mt-7 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5"
               >
                 <input type="hidden" name="id" value={selectedLead.id} />
                 <input type="hidden" name="returnTo" value={returnTo} />
@@ -704,7 +520,7 @@ export function LeadCrmList({
                     <select
                       name="status"
                       defaultValue={selectedLead.crm_status}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                     >
                       {statuses.map((status) => (
                         <option key={status} value={status}>
@@ -719,7 +535,7 @@ export function LeadCrmList({
                     <select
                       name="priority"
                       defaultValue={selectedLead.priority}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                     >
                       {priorities.map((priority) => (
                         <option key={priority} value={priority}>
@@ -736,7 +552,7 @@ export function LeadCrmList({
                     type="date"
                     name="followUpDate"
                     defaultValue={selectedLead.follow_up_date ?? ""}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                   />
                 </label>
 
@@ -748,7 +564,7 @@ export function LeadCrmList({
                     maxLength={5000}
                     defaultValue={selectedLead.internal_notes ?? ""}
                     placeholder="Add internal follow-up notes..."
-                    className="resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none placeholder:text-slate-400 focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
+                    className="resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none placeholder:text-slate-400 focus:border-primary-blue focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                   />
                 </label>
 

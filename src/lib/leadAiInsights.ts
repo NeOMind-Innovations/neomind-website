@@ -31,6 +31,7 @@ type LeadAiContext = {
   service_interest: string | null;
   message: string;
   status: string | null;
+  created_at: string;
   lead_metadata:
     | {
         crm_status: string | null;
@@ -41,8 +42,22 @@ type LeadAiContext = {
         crm_status: string | null;
         priority: string | null;
         internal_notes: string | null;
-      }>
+    }>
     | null;
+  lead_ai_insights: LeadAiInsight | LeadAiInsight[] | null;
+};
+
+export type LeadContextForAi = {
+  id: string;
+  name: string;
+  company: string | null;
+  service_interest: string | null;
+  message: string;
+  created_at: string;
+  crm_status: string;
+  priority: string;
+  notes: string;
+  ai_insight: LeadAiInsight | null;
 };
 
 type OpenAiResponse = {
@@ -128,7 +143,9 @@ function getMetadata(context: LeadAiContext) {
     : context.lead_metadata;
 }
 
-async function getLeadContext(inquiryId: string) {
+export async function getLeadContextForAi(
+  inquiryId: string,
+): Promise<LeadContextForAi> {
   if (!uuidPattern.test(inquiryId)) {
     throw new Error("Invalid lead identifier.");
   }
@@ -136,7 +153,7 @@ async function getLeadContext(inquiryId: string) {
   const { baseUrl, serviceRoleKey } = getSupabaseConfig();
   const params = new URLSearchParams({
     select:
-      "id,name,company,service_interest,message,status,lead_metadata(crm_status,priority,internal_notes)",
+      "id,name,company,service_interest,message,status,created_at,lead_metadata(crm_status,priority,internal_notes),lead_ai_insights(id,inquiry_id,lead_temperature,lead_score,summary,suggested_service,estimated_value,recommended_next_step,suggested_reply,proposal_outline,generated_at,updated_at)",
     id: `eq.${inquiryId}`,
     limit: "1",
   });
@@ -159,6 +176,9 @@ async function getLeadContext(inquiryId: string) {
   }
 
   const metadata = getMetadata(lead);
+  const aiInsight = Array.isArray(lead.lead_ai_insights)
+    ? (lead.lead_ai_insights[0] ?? null)
+    : lead.lead_ai_insights;
 
   return {
     id: lead.id,
@@ -166,9 +186,11 @@ async function getLeadContext(inquiryId: string) {
     company: lead.company,
     service_interest: lead.service_interest,
     message: lead.message,
+    created_at: lead.created_at,
     crm_status: metadata?.crm_status ?? lead.status ?? "new",
     priority: metadata?.priority ?? "medium",
     notes: metadata?.internal_notes ?? "",
+    ai_insight: aiInsight,
   };
 }
 
@@ -230,7 +252,9 @@ function normalizeInsight(value: unknown): LeadAiPayload | null {
   };
 }
 
-function createSafeFallback(context: Awaited<ReturnType<typeof getLeadContext>>) {
+function createSafeFallback(
+  context: Awaited<ReturnType<typeof getLeadContextForAi>>,
+) {
   return {
     lead_temperature: "warm" as const,
     lead_score: 50,
@@ -248,7 +272,7 @@ function createSafeFallback(context: Awaited<ReturnType<typeof getLeadContext>>)
 }
 
 async function generateInsight(
-  context: Awaited<ReturnType<typeof getLeadContext>>,
+  context: Awaited<ReturnType<typeof getLeadContextForAi>>,
 ) {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -358,7 +382,7 @@ async function saveInsight(inquiryId: string, insight: LeadAiPayload) {
 }
 
 export async function generateAndSaveLeadInsight(inquiryId: string) {
-  const context = await getLeadContext(inquiryId);
+  const context = await getLeadContextForAi(inquiryId);
   const insight = await generateInsight(context);
   return saveInsight(inquiryId, insight);
 }
