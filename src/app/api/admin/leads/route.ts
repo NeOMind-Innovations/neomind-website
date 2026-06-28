@@ -4,8 +4,9 @@ import {
   isSameOriginRequest,
 } from "@/lib/adminAuth";
 import {
+  isLeadPriority,
   isLeadStatus,
-  updateAdminLead,
+  upsertLeadMetadata,
 } from "@/lib/adminLeads";
 
 function getRedirectUrl(request: Request, returnTo: FormDataEntryValue | null) {
@@ -35,20 +36,31 @@ export async function POST(request: Request) {
   const redirectUrl = getRedirectUrl(request, formData.get("returnTo"));
   const id = formData.get("id");
   const status = formData.get("status");
-  const notes = formData.get("notes");
+  const priority = formData.get("priority");
+  const followUpDate = formData.get("followUpDate");
+  const internalNotes = formData.get("internalNotes");
 
   if (
     typeof id !== "string" ||
     typeof status !== "string" ||
-    typeof notes !== "string" ||
-    !isLeadStatus(status)
+    typeof priority !== "string" ||
+    typeof followUpDate !== "string" ||
+    typeof internalNotes !== "string" ||
+    !isLeadStatus(status) ||
+    !isLeadPriority(priority)
   ) {
     redirectUrl.searchParams.set("updateError", "1");
     return NextResponse.redirect(redirectUrl, 303);
   }
 
   try {
-    await updateAdminLead({ id, status, notes });
+    await upsertLeadMetadata({
+      inquiryId: id,
+      status,
+      priority,
+      followUpDate,
+      internalNotes,
+    });
     redirectUrl.searchParams.set("updated", "1");
   } catch {
     redirectUrl.searchParams.set("updateError", "1");

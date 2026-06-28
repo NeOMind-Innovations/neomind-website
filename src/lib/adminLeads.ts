@@ -10,7 +10,32 @@ export const leadStatuses = [
   "closed",
 ] as const;
 
+export const leadPriorities = ["high", "medium", "low"] as const;
+
 export type LeadStatus = (typeof leadStatuses)[number];
+export type LeadPriority = (typeof leadPriorities)[number];
+
+type LeadMetadataRecord = {
+  priority: LeadPriority | null;
+  follow_up_date: string | null;
+  assigned_to: string | null;
+  crm_status: LeadStatus | null;
+  internal_notes: string | null;
+};
+
+type RawAdminLead = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  company: string | null;
+  service_interest: string | null;
+  message: string;
+  status: string | null;
+  created_at: string;
+  ip_address: string | null;
+  lead_metadata: LeadMetadataRecord | LeadMetadataRecord[] | null;
+};
 
 export type AdminLead = {
   id: string;
@@ -20,10 +45,14 @@ export type AdminLead = {
   company: string | null;
   service_interest: string | null;
   message: string;
-  status: LeadStatus | null;
+  inquiry_status: string | null;
+  crm_status: LeadStatus;
+  priority: LeadPriority;
+  follow_up_date: string | null;
+  assigned_to: string | null;
+  internal_notes: string | null;
   created_at: string;
   ip_address: string | null;
-  notes: string | null;
 };
 
 export type LeadFilters = {
@@ -31,6 +60,8 @@ export type LeadFilters = {
   service?: string;
   search?: string;
 };
+
+export type LeadKpis = Record<LeadStatus | "total", number>;
 
 function getSupabaseAdminConfig() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -58,35 +89,67 @@ export function isLeadStatus(value: string): value is LeadStatus {
   return leadStatuses.some((status) => status === value);
 }
 
-export async function getAdminLeads(filters: LeadFilters) {
+export function isLeadPriority(value: string): value is LeadPriority {
+  return leadPriorities.some((priority) => priority === value);
+}
+
+function getLeadMetadata(
+  value: RawAdminLead["lead_metadata"],
+): LeadMetadataRecord | null {
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function normalizeLead(rawLead: RawAdminLead): AdminLead {
+  const metadata = getLeadMetadata(rawLead.lead_metadata);
+  const fallbackStatus =
+    rawLead.status && isLeadStatus(rawLead.status) ? rawLead.status : "new";
+
+  return {
+    id: rawLead.id,
+    name: rawLead.name,
+    email: rawLead.email,
+    phone: rawLead.phone,
+    company: rawLead.company,
+    service_interest: rawLead.service_interest,
+    message: rawLead.message,
+    inquiry_status: rawLead.status,
+    crm_status:
+      metadata?.crm_status && isLeadStatus(metadata.crm_status)
+        ? metadata.crm_status
+        : fallbackStatus,
+    priority:
+      metadata?.priority && isLeadPriority(metadata.priority)
+        ? metadata.priority
+        : "medium",
+    follow_up_date: metadata?.follow_up_date ?? null,
+    assigned_to: metadata?.assigned_to ?? null,
+    internal_notes: metadata?.internal_notes ?? null,
+    created_at: rawLead.created_at,
+    ip_address: rawLead.ip_address,
+  };
+}
+
+function createEmptyKpis(): LeadKpis {
+  return {
+    total: 0,
+    new: 0,
+    contacted: 0,
+    qualified: 0,
+    proposal_sent: 0,
+    won: 0,
+    lost: 0,
+    closed: 0,
+  };
+}
+
+export async function getAdminLeadDashboard(filters: LeadFilters) {
   const { baseUrl, serviceRoleKey } = getSupabaseAdminConfig();
   const params = new URLSearchParams({
     select:
-      "id,name,email,phone,company,service_interest,message,status,created_at,ip_address,notes",
+      "id,name,email,phone,company,service_interest,message,status,created_at,ip_address,lead_metadata(priority,follow_up_date,assigned_to,crm_status,internal_notes)",
     order: "created_at.desc",
-    limit: "250",
+    limit: "5000",
   });
-
-  if (filters.status && isLeadStatus(filters.status)) {
-    params.set("status", `eq.${filters.status}`);
-  }
-
-  if (filters.service) {
-    params.set("service_interest", `eq.${filters.service.slice(0, 150)}`);
-  }
-
-  const search = filters.search
-    ?.trim()
-    .slice(0, 100)
-    .replace(/[,*()]/g, " ");
-
-  if (search) {
-    params.set(
-      "or",
-      `(name.ilike.*${search}*,email.ilike.*${search}*,company.ilike.*${search}*)`,
-    );
-  }
-
   const response = await fetch(
     `${baseUrl}/rest/v1/contact_inquiries?${params.toString()}`,
     {
@@ -99,48 +162,87 @@ export async function getAdminLeads(filters: LeadFilters) {
     throw new Error(`Unable to load leads (${response.status}).`);
   }
 
-  return (await response.json()) as AdminLead[];
-}
-
-export async function getLeadServiceInterests() {
-  const { baseUrl, serviceRoleKey } = getSupabaseAdminConfig();
-  const params = new URLSearchParams({
-    select: "service_interest",
-    service_interest: "not.is.null",
-    order: "service_interest.asc",
-    limit: "1000",
-  });
-  const response = await fetch(
-    `${baseUrl}/rest/v1/contact_inquiries?${params.toString()}`,
-    {
-      headers: getAdminHeaders(serviceRoleKey),
-      cache: "no-store",
-    },
+  const allLeads = ((await response.json()) as RawAdminLead[]).map(
+    normalizeLead,
   );
-
-  if (!response.ok) {
-    throw new Error(`Unable to load service filters (${response.status}).`);
-  }
-
-  const rows = (await response.json()) as Array<{
-    service_interest: string | null;
-  }>;
-
-  return Array.from(
+  const kpis = allLeads.reduce((counts, lead) => {
+    counts.total += 1;
+    counts[lead.crm_status] += 1;
+    return counts;
+  }, createEmptyKpis());
+  const serviceInterests = Array.from(
     new Set(
-      rows
-        .map((row) => row.service_interest?.trim())
+      allLeads
+        .map((lead) => lead.service_interest?.trim())
         .filter((service): service is string => Boolean(service)),
     ),
+  ).sort((left, right) => left.localeCompare(right));
+  const requestedStatus =
+    filters.status && isLeadStatus(filters.status) ? filters.status : null;
+  const requestedService = filters.service?.trim().toLocaleLowerCase();
+  const search = filters.search?.trim().slice(0, 100).toLocaleLowerCase();
+
+  const leads = allLeads.filter((lead) => {
+    if (requestedStatus && lead.crm_status !== requestedStatus) {
+      return false;
+    }
+
+    if (
+      requestedService &&
+      lead.service_interest?.toLocaleLowerCase() !== requestedService
+    ) {
+      return false;
+    }
+
+    if (
+      search &&
+      ![lead.name, lead.email, lead.company ?? ""].some((value) =>
+        value.toLocaleLowerCase().includes(search),
+      )
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+  return { leads, kpis, serviceInterests };
+}
+
+function isValidUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
   );
 }
 
-export async function updateAdminLead(input: {
-  id: string;
+function normalizeFollowUpDate(value: string) {
+  const date = value.trim();
+
+  if (!date) {
+    return null;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error("Invalid follow-up date.");
+  }
+
+  const parsed = new Date(`${date}T00:00:00Z`);
+
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    throw new Error("Invalid follow-up date.");
+  }
+
+  return date;
+}
+
+export async function upsertLeadMetadata(input: {
+  inquiryId: string;
   status: LeadStatus;
-  notes: string;
+  priority: LeadPriority;
+  followUpDate: string;
+  internalNotes: string;
 }) {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.id)) {
+  if (!isValidUuid(input.inquiryId)) {
     throw new Error("Invalid lead identifier.");
   }
 
@@ -148,26 +250,32 @@ export async function updateAdminLead(input: {
     throw new Error("Invalid lead status.");
   }
 
-  const notes = input.notes.trim().slice(0, 5000);
+  if (!isLeadPriority(input.priority)) {
+    throw new Error("Invalid lead priority.");
+  }
+
   const { baseUrl, serviceRoleKey } = getSupabaseAdminConfig();
-  const params = new URLSearchParams({ id: `eq.${input.id}` });
+  const params = new URLSearchParams({ on_conflict: "inquiry_id" });
   const response = await fetch(
-    `${baseUrl}/rest/v1/contact_inquiries?${params.toString()}`,
+    `${baseUrl}/rest/v1/lead_metadata?${params.toString()}`,
     {
-      method: "PATCH",
+      method: "POST",
       headers: {
         ...getAdminHeaders(serviceRoleKey),
-        Prefer: "return=minimal",
+        Prefer: "resolution=merge-duplicates,return=minimal",
       },
       body: JSON.stringify({
-        status: input.status,
-        notes: notes || null,
+        inquiry_id: input.inquiryId,
+        crm_status: input.status,
+        priority: input.priority,
+        follow_up_date: normalizeFollowUpDate(input.followUpDate),
+        internal_notes: input.internalNotes.trim().slice(0, 5000) || null,
       }),
       cache: "no-store",
     },
   );
 
   if (!response.ok) {
-    throw new Error(`Unable to update lead (${response.status}).`);
+    throw new Error(`Unable to update lead metadata (${response.status}).`);
   }
 }

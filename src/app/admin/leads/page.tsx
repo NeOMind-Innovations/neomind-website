@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
 import {
   isAdminAuthenticated,
   isAdminPasswordConfigured,
 } from "@/lib/adminAuth";
 import {
-  getAdminLeads,
-  getLeadServiceInterests,
+  getAdminLeadDashboard,
+  leadPriorities,
   leadStatuses,
   type AdminLead,
   type LeadFilters,
+  type LeadKpis,
 } from "@/lib/adminLeads";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +45,38 @@ const statusStyles: Record<string, string> = {
   closed: "bg-slate-100 text-slate-700 ring-slate-600/20",
 };
 
+const priorityStyles = {
+  high: "bg-red-50 text-red-700 ring-red-600/20",
+  medium: "bg-amber-50 text-amber-700 ring-amber-600/20",
+  low: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+};
+
+const emptyKpis: LeadKpis = {
+  total: 0,
+  new: 0,
+  contacted: 0,
+  qualified: 0,
+  proposal_sent: 0,
+  won: 0,
+  lost: 0,
+  closed: 0,
+};
+
+const kpiCards: Array<{
+  key: keyof LeadKpis;
+  label: string;
+  accent: string;
+}> = [
+  { key: "total", label: "Total Leads", accent: "bg-deep-navy" },
+  { key: "new", label: "New", accent: "bg-blue-500" },
+  { key: "contacted", label: "Contacted", accent: "bg-cyan-500" },
+  { key: "qualified", label: "Qualified", accent: "bg-violet-500" },
+  { key: "proposal_sent", label: "Proposal Sent", accent: "bg-amber-500" },
+  { key: "won", label: "Won", accent: "bg-emerald-500" },
+  { key: "lost", label: "Lost", accent: "bg-rose-500" },
+  { key: "closed", label: "Closed", accent: "bg-slate-500" },
+];
+
 function formatStatus(status: string) {
   return status
     .split("_")
@@ -65,7 +99,31 @@ function formatDate(value: string) {
 }
 
 function valueOrDash(value: string | null) {
-  return value || "—";
+  return value || "Not provided";
+}
+
+function getTodayInIndia() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
+
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function isOverdueFollowUp(lead: AdminLead) {
+  const followUpDate = lead.follow_up_date;
+
+  return (
+    followUpDate !== null &&
+    followUpDate < getTodayInIndia() &&
+    !["won", "lost", "closed"].includes(lead.crm_status)
+  );
 }
 
 function buildReturnTo(filters: LeadFilters) {
@@ -154,10 +212,17 @@ function LeadCard({
   lead: AdminLead;
   returnTo: string;
 }) {
-  const currentStatus = lead.status ?? "new";
+  const currentStatus = lead.crm_status;
+  const isOverdue = isOverdueFollowUp(lead);
 
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <article
+      className={`overflow-hidden rounded-xl bg-white shadow-sm ${
+        isOverdue
+          ? "border border-red-300 ring-2 ring-red-100"
+          : "border border-slate-200"
+      }`}
+    >
       <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
@@ -169,22 +234,31 @@ function LeadCard({
             >
               {formatStatus(currentStatus)}
             </span>
+            <span
+              className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ring-inset ${priorityStyles[lead.priority]}`}
+            >
+              {lead.priority} priority
+            </span>
+            {isOverdue ? (
+              <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">
+                Follow-up overdue
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 text-sm text-slate-500">
             Received {formatDate(lead.created_at)}
           </p>
         </div>
-        <a
-          href={`mailto:${lead.email}`}
-          className="text-sm font-semibold text-primary-blue hover:text-deep-navy"
-        >
-          {lead.email}
-        </a>
+        <LeadQuickActions email={lead.email} phone={lead.phone} />
       </div>
 
       <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.7fr)]">
         <div className="space-y-6">
-          <dl className="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <dl className="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-3">
+            <div>
+              <dt className="font-semibold text-slate-500">Email</dt>
+              <dd className="mt-1 break-words text-charcoal">{lead.email}</dd>
+            </div>
             <div>
               <dt className="font-semibold text-slate-500">Phone</dt>
               <dd className="mt-1 break-words text-charcoal">
@@ -209,6 +283,16 @@ function LeadCard({
                 {valueOrDash(lead.ip_address)}
               </dd>
             </div>
+            <div>
+              <dt className="font-semibold text-slate-500">Follow-up</dt>
+              <dd
+                className={`mt-1 break-words ${
+                  isOverdue ? "font-semibold text-red-700" : "text-charcoal"
+                }`}
+              >
+                {lead.follow_up_date ?? "Not scheduled"}
+              </dd>
+            </div>
           </dl>
 
           <div>
@@ -226,28 +310,57 @@ function LeadCard({
         >
           <input type="hidden" name="id" value={lead.id} />
           <input type="hidden" name="returnTo" value={returnTo} />
-          <label className="grid gap-2 text-sm font-semibold text-charcoal">
-            Status
-            <select
-              name="status"
-              defaultValue={currentStatus}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
-            >
-              {leadStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {formatStatus(status)}
-                </option>
-              ))}
-            </select>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-semibold text-charcoal">
+              CRM status
+              <select
+                name="status"
+                defaultValue={currentStatus}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
+              >
+                {leadStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {formatStatus(status)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="grid gap-2 text-sm font-semibold text-charcoal">
+              Priority
+              <select
+                name="priority"
+                defaultValue={lead.priority}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal capitalize outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
+              >
+                {leadPriorities.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {formatStatus(priority)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="mt-4 grid gap-2 text-sm font-semibold text-charcoal">
+            Follow-up date
+            <input
+              type="date"
+              name="followUpDate"
+              defaultValue={lead.follow_up_date ?? ""}
+              className={`rounded-lg border bg-white px-3 py-2.5 font-normal outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100 ${
+                isOverdue ? "border-red-400 text-red-700" : "border-slate-300"
+              }`}
+            />
           </label>
 
           <label className="mt-4 grid gap-2 text-sm font-semibold text-charcoal">
-            Notes
+            Internal notes
             <textarea
-              name="notes"
+              name="internalNotes"
               rows={5}
               maxLength={5000}
-              defaultValue={lead.notes ?? ""}
+              defaultValue={lead.internal_notes ?? ""}
               placeholder="Add internal follow-up notes..."
               className="resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none placeholder:text-slate-400 focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
             />
@@ -285,13 +398,14 @@ export default async function AdminLeadsPage({
   const returnTo = buildReturnTo(filters);
   let leads: AdminLead[] = [];
   let serviceInterests: string[] = [];
+  let kpis = emptyKpis;
   let loadError = "";
 
   try {
-    [leads, serviceInterests] = await Promise.all([
-      getAdminLeads(filters),
-      getLeadServiceInterests(),
-    ]);
+    const dashboard = await getAdminLeadDashboard(filters);
+    leads = dashboard.leads;
+    serviceInterests = dashboard.serviceInterests;
+    kpis = dashboard.kpis;
   } catch (error) {
     loadError =
       error instanceof Error ? error.message : "Unable to load lead data.";
@@ -337,6 +451,29 @@ export default async function AdminLeadsPage({
             {leads.length} {leads.length === 1 ? "lead" : "leads"} shown
           </p>
         </div>
+
+        <section
+          className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8"
+          aria-label="Lead performance summary"
+        >
+          {kpiCards.map((card) => (
+            <div
+              key={card.key}
+              className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <span
+                className={`absolute inset-x-0 top-0 h-1 ${card.accent}`}
+                aria-hidden="true"
+              />
+              <p className="text-2xl font-bold tracking-tight text-charcoal">
+                {kpis[card.key]}
+              </p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                {card.label}
+              </p>
+            </div>
+          ))}
+        </section>
 
         <form
           action="/admin/leads"
