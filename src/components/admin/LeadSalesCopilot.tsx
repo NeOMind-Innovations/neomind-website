@@ -84,6 +84,7 @@ type LeadSalesCopilotProps = {
     ai_insight: LeadAiInsight | null;
   };
   onInsightUpdated: (insight: LeadAiInsight) => void;
+  crmContent: React.ReactNode;
 };
 
 const emptyMemory: CopilotMemory = {
@@ -98,9 +99,10 @@ const emptyMemory: CopilotMemory = {
 
 const suggestedQuestions = [
   "What should I quote?",
-  "How should I approach this customer?",
-  "What objections might arise?",
-  "What features should I highlight?",
+  "Draft a follow-up email",
+  "Prepare for a discovery call",
+  "What objections should I expect?",
+  "How can I close this lead?",
 ];
 
 function clampPercentage(value: number) {
@@ -197,6 +199,7 @@ function SectionCard({
 export function LeadSalesCopilot({
   lead,
   onInsightUpdated,
+  crmContent,
 }: LeadSalesCopilotProps) {
   const [memory, setMemory] = useState<CopilotMemory>(emptyMemory);
   const [isLoadingMemory, setIsLoadingMemory] = useState(true);
@@ -204,6 +207,7 @@ export function LeadSalesCopilot({
   const [error, setError] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"ai" | "crm" | "timeline">("ai");
 
   const loadMemory = useCallback(async () => {
     setIsLoadingMemory(true);
@@ -238,6 +242,7 @@ export function LeadSalesCopilot({
   useEffect(() => {
     setMemory(emptyMemory);
     setChatInput("");
+    setActiveTab("ai");
     void loadMemory();
   }, [loadMemory]);
 
@@ -374,19 +379,48 @@ export function LeadSalesCopilot({
             sales guidance.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={generateInsight}
-          disabled={isBusy}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-wait disabled:bg-violet-300"
-        >
-          {activeAction === "insight" ? (
-            <LoaderCircle size={15} className="animate-spin" aria-hidden="true" />
-          ) : (
-            <Sparkles size={15} aria-hidden="true" />
-          )}
-          {insight ? "Refresh Lead Insight" : "Generate Lead Insight"}
-        </button>
+        {activeTab === "ai" ? (
+          <button
+            type="button"
+            onClick={generateInsight}
+            disabled={isBusy}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-wait disabled:bg-violet-300"
+          >
+            {activeAction === "insight" ? (
+              <LoaderCircle
+                size={15}
+                className="animate-spin"
+                aria-hidden="true"
+              />
+            ) : (
+              <Sparkles size={15} aria-hidden="true" />
+            )}
+            {insight ? "Refresh Lead Insight" : "Generate Lead Insight"}
+          </button>
+        ) : null}
+      </div>
+
+      <div
+        className="grid grid-cols-3 rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900"
+        role="tablist"
+        aria-label="Lead drawer sections"
+      >
+        {(["ai", "crm", "timeline"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            onClick={() => setActiveTab(tab)}
+            className={`rounded-lg px-3 py-2.5 text-sm font-semibold capitalize transition ${
+              activeTab === tab
+                ? "bg-deep-navy text-white shadow-sm"
+                : "text-slate-500 hover:bg-slate-50 hover:text-charcoal dark:hover:bg-slate-800 dark:hover:text-white"
+            }`}
+          >
+            {tab === "ai" ? "AI" : tab === "crm" ? "CRM" : "Timeline"}
+          </button>
+        ))}
       </div>
 
       {error ? (
@@ -398,44 +432,65 @@ export function LeadSalesCopilot({
         </p>
       ) : null}
 
-      {isLoadingMemory ? <LoadingSkeleton /> : null}
+      {isLoadingMemory && activeTab !== "crm" ? <LoadingSkeleton /> : null}
 
-      {insight ? (
+      {activeTab === "ai" ? (
         <>
+          {insight ? (
+            <>
+          <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-blue-50 p-5 shadow-sm dark:border-violet-900 dark:from-violet-950 dark:via-slate-900 dark:to-blue-950">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-600 dark:text-violet-300">
+              AI Executive Summary
+            </p>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
+              {insight.summary}
+            </p>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-              <div
-                className="grid h-20 w-20 shrink-0 place-items-center rounded-full p-2"
-                style={{
-                  background: `conic-gradient(${scoreColor} ${score * 3.6}deg, #e2e8f0 0deg)`,
-                }}
-                aria-label={`Lead score ${score} out of 100`}
-              >
-                <div className="grid h-full w-full place-items-center rounded-full bg-white dark:bg-slate-900">
-                  <span className="text-xl font-bold text-charcoal dark:text-white">
-                    {score}
-                  </span>
-                </div>
-              </div>
-              <div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Lead Score
                 </p>
-                <p className="mt-1 text-sm font-semibold text-charcoal dark:text-white">
-                  {score >= 80
-                    ? "Strong opportunity"
-                    : score >= 50
-                      ? "Needs qualification"
-                      : "Early-stage lead"}
-                </p>
+                <span className="text-xl font-bold text-charcoal dark:text-white">
+                  {score}
+                  <span className="text-xs font-medium text-slate-400">
+                    /100
+                  </span>
+                </span>
               </div>
+              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${score}%`,
+                    backgroundColor: scoreColor,
+                  }}
+                />
+              </div>
+              <p className="mt-2 text-xs font-medium text-slate-500">
+                {score >= 80
+                  ? "Strong opportunity"
+                  : score >= 50
+                    ? "Needs qualification"
+                    : "Early-stage lead"}
+              </p>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Lead Temperature
               </p>
-              <p className="mt-3 text-2xl font-bold capitalize text-charcoal dark:text-white">
+              <p
+                className={`mt-3 inline-flex rounded-full px-3 py-1.5 text-sm font-bold capitalize ${
+                  insight.lead_temperature === "hot"
+                    ? "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300"
+                    : insight.lead_temperature === "cold"
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                      : "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                }`}
+              >
                 {getTemperatureLabel(insight.lead_temperature)}
               </p>
               <p className="mt-2 text-xs text-slate-500">
@@ -617,6 +672,10 @@ export function LeadSalesCopilot({
           ) : null}
         </div>
         {proposal ? (
+          <details className="mt-4 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
+            <summary className="cursor-pointer text-sm font-semibold text-primary-blue">
+              View generated proposal
+            </summary>
           <div className="mt-4 space-y-4 text-sm">
             <div>
               <h4 className="font-semibold text-charcoal dark:text-white">
@@ -683,6 +742,7 @@ export function LeadSalesCopilot({
               </ul>
             </div>
           </div>
+          </details>
         ) : null}
       </SectionCard>
 
@@ -720,7 +780,11 @@ export function LeadSalesCopilot({
           ) : null}
         </div>
         {reply ? (
-          <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-800">
+          <details className="mt-4 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
+            <summary className="cursor-pointer text-sm font-semibold text-primary-blue">
+              View generated reply
+            </summary>
+          <div className="mt-4 text-sm">
             <p className="font-semibold text-charcoal dark:text-white">
               Subject: {reply.subject}
             </p>
@@ -728,6 +792,7 @@ export function LeadSalesCopilot({
               {reply.body}
             </p>
           </div>
+          </details>
         ) : null}
       </SectionCard>
 
@@ -765,18 +830,20 @@ export function LeadSalesCopilot({
             </div>
           ) : null}
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {suggestedQuestions.map((question) => (
-            <button
-              key={question}
-              type="button"
-              onClick={() => setChatInput(question)}
-              className="rounded-full border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:border-primary-blue hover:text-primary-blue dark:border-slate-600 dark:text-slate-300"
-            >
-              {question}
-            </button>
-          ))}
-        </div>
+        {memory.messages.length === 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {suggestedQuestions.map((question) => (
+              <button
+                key={question}
+                type="button"
+                onClick={() => setChatInput(question)}
+                className="rounded-full border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:border-primary-blue hover:text-primary-blue dark:border-slate-600 dark:text-slate-300"
+              >
+                {question}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <form onSubmit={submitChat} className="mt-3 flex gap-2">
           <input
             type="text"
@@ -797,6 +864,12 @@ export function LeadSalesCopilot({
         </form>
       </SectionCard>
 
+        </>
+      ) : null}
+
+      {activeTab === "crm" ? crmContent : null}
+
+      {activeTab === "timeline" ? (
       <SectionCard
         title="CRM Timeline"
         icon={<Clock3 size={17} aria-hidden="true" />}
@@ -805,7 +878,19 @@ export function LeadSalesCopilot({
           {memory.timeline.map((event, index) => (
             <li key={event.id} className="relative flex gap-3">
               <div className="flex flex-col items-center">
-                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary-blue ring-4 ring-blue-100 dark:ring-blue-950" />
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-50 text-primary-blue ring-1 ring-blue-200 dark:bg-blue-950 dark:ring-blue-900">
+                  {event.label === "Lead Created" ? (
+                    <Target size={14} aria-hidden="true" />
+                  ) : event.label.includes("AI") ? (
+                    <Sparkles size={14} aria-hidden="true" />
+                  ) : event.label.includes("Proposal") ? (
+                    <FileText size={14} aria-hidden="true" />
+                  ) : event.label.includes("Reply") ? (
+                    <Mail size={14} aria-hidden="true" />
+                  ) : (
+                    <Clock3 size={14} aria-hidden="true" />
+                  )}
+                </span>
                 {index < memory.timeline.length - 1 ? (
                   <span className="mt-1 h-full w-px bg-slate-200 dark:bg-slate-700" />
                 ) : null}
@@ -823,6 +908,7 @@ export function LeadSalesCopilot({
           ))}
         </ol>
       </SectionCard>
+      ) : null}
     </section>
   );
 }

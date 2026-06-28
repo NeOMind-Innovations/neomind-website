@@ -438,10 +438,10 @@ export function LeadCrmList({
                 </span>
               </div>
 
-              <section className="mt-6">
-                <h3 className="text-sm font-bold text-charcoal">
-                  Inquiry details
-                </h3>
+              <details className="mt-5 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <summary className="cursor-pointer text-sm font-bold text-charcoal dark:text-white">
+                  View full inquiry details
+                </summary>
                 <dl className="mt-3 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2">
                   <div>
                     <dt className="font-semibold text-slate-500">Email</dt>
@@ -495,19 +495,18 @@ export function LeadCrmList({
                     {selectedLead.message}
                   </p>
                 </div>
-              </section>
+              </details>
 
               <LeadSalesCopilot
                 lead={selectedLead}
                 onInsightUpdated={handleInsightUpdated}
-              />
-
-              <form
-                key={selectedLead.id}
-                action="/api/admin/leads"
-                method="post"
-                className="mt-7 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5"
-              >
+                crmContent={
+                  <form
+                    key={selectedLead.id}
+                    action="/api/admin/leads"
+                    method="post"
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5"
+                  >
                 <input type="hidden" name="id" value={selectedLead.id} />
                 <input type="hidden" name="returnTo" value={returnTo} />
 
@@ -574,7 +573,9 @@ export function LeadCrmList({
                 >
                   Save changes
                 </button>
-              </form>
+                  </form>
+                }
+              />
             </div>
           </section>
         </div>
