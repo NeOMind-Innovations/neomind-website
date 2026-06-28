@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LeadQuickActions } from "@/components/admin/LeadQuickActions";
+import { LeadCrmList } from "@/components/admin/LeadCrmList";
 import {
   isAdminAuthenticated,
   isAdminPasswordConfigured,
@@ -35,22 +35,6 @@ type AdminLeadsPageProps = {
   };
 };
 
-const statusStyles: Record<string, string> = {
-  new: "bg-blue-50 text-blue-700 ring-blue-600/20",
-  contacted: "bg-cyan-50 text-cyan-700 ring-cyan-600/20",
-  qualified: "bg-violet-50 text-violet-700 ring-violet-600/20",
-  proposal_sent: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  won: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-  lost: "bg-rose-50 text-rose-700 ring-rose-600/20",
-  closed: "bg-slate-100 text-slate-700 ring-slate-600/20",
-};
-
-const priorityStyles = {
-  high: "bg-red-50 text-red-700 ring-red-600/20",
-  medium: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  low: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-};
-
 const emptyKpis: LeadKpis = {
   total: 0,
   new: 0,
@@ -82,48 +66,6 @@ function formatStatus(status: string) {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Kolkata",
-  }).format(date);
-}
-
-function valueOrDash(value: string | null) {
-  return value || "Not provided";
-}
-
-function getTodayInIndia() {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(
-    parts.map((part) => [part.type, part.value]),
-  );
-
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
-function isOverdueFollowUp(lead: AdminLead) {
-  const followUpDate = lead.follow_up_date;
-
-  return (
-    followUpDate !== null &&
-    followUpDate < getTodayInIndia() &&
-    !["won", "lost", "closed"].includes(lead.crm_status)
-  );
 }
 
 function buildReturnTo(filters: LeadFilters) {
@@ -202,179 +144,6 @@ function LoginScreen({
         </form>
       </section>
     </main>
-  );
-}
-
-function LeadCard({
-  lead,
-  returnTo,
-}: {
-  lead: AdminLead;
-  returnTo: string;
-}) {
-  const currentStatus = lead.crm_status;
-  const isOverdue = isOverdueFollowUp(lead);
-
-  return (
-    <article
-      className={`overflow-hidden rounded-xl bg-white shadow-sm ${
-        isOverdue
-          ? "border border-red-300 ring-2 ring-red-100"
-          : "border border-slate-200"
-      }`}
-    >
-      <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-lg font-bold text-charcoal">{lead.name}</h2>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
-                statusStyles[currentStatus] ?? statusStyles.new
-              }`}
-            >
-              {formatStatus(currentStatus)}
-            </span>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ring-inset ${priorityStyles[lead.priority]}`}
-            >
-              {lead.priority} priority
-            </span>
-            {isOverdue ? (
-              <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">
-                Follow-up overdue
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-1 text-sm text-slate-500">
-            Received {formatDate(lead.created_at)}
-          </p>
-        </div>
-        <LeadQuickActions email={lead.email} phone={lead.phone} />
-      </div>
-
-      <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.7fr)]">
-        <div className="space-y-6">
-          <dl className="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-3">
-            <div>
-              <dt className="font-semibold text-slate-500">Email</dt>
-              <dd className="mt-1 break-words text-charcoal">{lead.email}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-500">Phone</dt>
-              <dd className="mt-1 break-words text-charcoal">
-                {valueOrDash(lead.phone)}
-              </dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-500">Company</dt>
-              <dd className="mt-1 break-words text-charcoal">
-                {valueOrDash(lead.company)}
-              </dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-500">Service interest</dt>
-              <dd className="mt-1 break-words text-charcoal">
-                {valueOrDash(lead.service_interest)}
-              </dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-500">IP address</dt>
-              <dd className="mt-1 break-words font-mono text-xs text-charcoal">
-                {valueOrDash(lead.ip_address)}
-              </dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-500">Follow-up</dt>
-              <dd
-                className={`mt-1 break-words ${
-                  isOverdue ? "font-semibold text-red-700" : "text-charcoal"
-                }`}
-              >
-                {lead.follow_up_date ?? "Not scheduled"}
-              </dd>
-            </div>
-          </dl>
-
-          <div>
-            <h3 className="text-sm font-semibold text-slate-500">Message</h3>
-            <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-light-gray p-4 text-sm leading-6 text-slate-700">
-              {lead.message}
-            </p>
-          </div>
-        </div>
-
-        <form
-          action="/api/admin/leads"
-          method="post"
-          className="rounded-lg border border-slate-200 bg-slate-50 p-4"
-        >
-          <input type="hidden" name="id" value={lead.id} />
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2 text-sm font-semibold text-charcoal">
-              CRM status
-              <select
-                name="status"
-                defaultValue={currentStatus}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
-              >
-                {leadStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {formatStatus(status)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="grid gap-2 text-sm font-semibold text-charcoal">
-              Priority
-              <select
-                name="priority"
-                defaultValue={lead.priority}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal capitalize outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
-              >
-                {leadPriorities.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {formatStatus(priority)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <label className="mt-4 grid gap-2 text-sm font-semibold text-charcoal">
-            Follow-up date
-            <input
-              type="date"
-              name="followUpDate"
-              defaultValue={lead.follow_up_date ?? ""}
-              className={`rounded-lg border bg-white px-3 py-2.5 font-normal outline-none focus:border-primary-blue focus:ring-4 focus:ring-blue-100 ${
-                isOverdue ? "border-red-400 text-red-700" : "border-slate-300"
-              }`}
-            />
-          </label>
-
-          <label className="mt-4 grid gap-2 text-sm font-semibold text-charcoal">
-            Internal notes
-            <textarea
-              name="internalNotes"
-              rows={5}
-              maxLength={5000}
-              defaultValue={lead.internal_notes ?? ""}
-              placeholder="Add internal follow-up notes..."
-              className="resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none placeholder:text-slate-400 focus:border-primary-blue focus:ring-4 focus:ring-blue-100"
-            />
-          </label>
-
-          <button
-            type="submit"
-            className="mt-4 w-full rounded-lg bg-deep-navy px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-blue"
-          >
-            Save changes
-          </button>
-        </form>
-      </div>
-    </article>
   );
 }
 
@@ -577,11 +346,16 @@ export default async function AdminLeadsPage({
           </div>
         ) : null}
 
-        <div className="mt-6 space-y-5">
-          {leads.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} returnTo={returnTo} />
-          ))}
-        </div>
+        {leads.length > 0 ? (
+          <div className="mt-6">
+            <LeadCrmList
+              leads={leads}
+              returnTo={returnTo}
+              statuses={leadStatuses}
+              priorities={leadPriorities}
+            />
+          </div>
+        ) : null}
       </div>
     </main>
   );

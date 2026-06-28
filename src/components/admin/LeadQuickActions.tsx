@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Mail, Phone } from "lucide-react";
+import { Copy, Eye, Mail, Phone } from "lucide-react";
 
 type LeadQuickActionsProps = {
   email: string;
   phone: string | null;
+  onView: () => void;
 };
 
 export function LeadQuickActions({
   email,
   phone,
+  onView,
 }: LeadQuickActionsProps) {
   const [copied, setCopied] = useState<"email" | "phone" | null>(null);
 
@@ -29,6 +31,14 @@ export function LeadQuickActions({
 
   return (
     <div className="flex flex-wrap gap-2" aria-label="Lead quick actions">
+      <button
+        type="button"
+        onClick={onView}
+        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-deep-navy px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary-blue"
+      >
+        <Eye size={14} aria-hidden="true" />
+        View
+      </button>
       <a href={`mailto:${email}`} className={actionClassName}>
         <Mail size={14} aria-hidden="true" />
         Email
